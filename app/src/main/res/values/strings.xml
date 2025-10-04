@@ -11,4 +11,10 @@
     <string name="save_data">Сохранить данные</string>
     <string name="select_date">Выбрать дату рождения</string>
     <string name="player_data">Данные игрока</string>
+
+    <string name="player_tab">Игрок</string>
+    <string name="rules_tab">Правила</string>
+    <string name="authors_tab">Авторы</string>
+    <string name="settings_tab">Настройки</string>
+    <string name="rules_file_name">rules</string>
 </resources>
