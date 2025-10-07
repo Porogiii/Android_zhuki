@@ -79,7 +79,7 @@ fun MainScreen() {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = "game",
+            startDestination = "profile",
             modifier = Modifier.padding(innerPadding)
         ) {
             composable("game") { GameScreen(settings = gameSettings) }

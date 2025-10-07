@@ -119,9 +119,9 @@ fun GameScreen(
                     Text("Сыграть снова")
                 }
                 Spacer(Modifier.height(10.dp))
-                Button(onClick = onExit) {
-                    Text("Выход в меню")
-                }
+//                Button(onClick = onExit) {
+//                    Text("Выход в меню")
+//                }
             }
         } else {
             val painter = painterResource(id = R.drawable.bug)
@@ -192,6 +192,5 @@ private fun randomBug(areaWidthPx: Float, areaHeightPx: Float, speed: Float): Bu
 }
 
 private fun randomVelocity(speed: Float): Float {
-    val base = Random.nextFloat() * 10f - 5f
-    return base * speed
+    return 5f * speed
 }
