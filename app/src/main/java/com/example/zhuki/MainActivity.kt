@@ -1,5 +1,6 @@
 package com.example.zhuki
 
+import com.example.zhuki.MainScreen
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
