@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.IntOffset
@@ -18,6 +19,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.Alignment
 import com.example.zhuki.R
 import com.example.zhuki.model.GameSettings
+import com.example.zhuki.model.Player
+import com.example.zhuki.model.ScoreRecord
+import com.example.zhuki.model.AppDatabase
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlin.random.Random
 
@@ -33,12 +38,18 @@ data class Bug(
 fun GameScreen(
     modifier: Modifier = Modifier,
     settings: GameSettings,
+    player: Player,
     onExit: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val database = remember { AppDatabase.getInstance(context) }
+    val coroutineScope = rememberCoroutineScope()
+
     var bugs by remember { mutableStateOf(listOf<Bug>()) }
     var score by remember { mutableStateOf(0) }
     var timeLeft by remember(settings.roundDuration) { mutableStateOf(settings.roundDuration) }
     var gameOver by remember { mutableStateOf(false) }
+    var scoreSaved by remember { mutableStateOf(false) }
 
     BoxWithConstraints(
         modifier = modifier
@@ -49,14 +60,12 @@ fun GameScreen(
         val areaWidthPx = with(density) { maxWidth.toPx() }
         val areaHeightPx = with(density) { maxHeight.toPx() }
 
-        // Инициализация жуков
         LaunchedEffect(areaWidthPx, areaHeightPx) {
             if (bugs.isEmpty() && areaWidthPx > 0f && areaHeightPx > 0f) {
                 bugs = List(settings.maxCockroaches) { randomBug(areaWidthPx, areaHeightPx, settings.gameSpeed) }
             }
         }
 
-        // Обновление настроек
         LaunchedEffect(settings) {
             timeLeft = timeLeft.coerceAtMost(settings.roundDuration)
             val diff = settings.maxCockroaches - bugs.size
@@ -68,7 +77,6 @@ fun GameScreen(
             bugs = bugs.map { it.copy(vx = randomVelocity(settings.gameSpeed), vy = randomVelocity(settings.gameSpeed)) }
         }
 
-        // Движение жуков
         LaunchedEffect(bugs, settings.gameSpeed, gameOver, areaWidthPx, areaHeightPx) {
             while (!gameOver) {
                 val delayMs = maxOf(5L, (30L / settings.gameSpeed).toLong())
@@ -90,7 +98,6 @@ fun GameScreen(
             }
         }
 
-        // Таймер
         LaunchedEffect(timeLeft, gameOver, settings.roundDuration) {
             if (!gameOver) {
                 if (timeLeft > 0) {
@@ -102,6 +109,26 @@ fun GameScreen(
             }
         }
 
+        LaunchedEffect(gameOver) {
+            if (gameOver && !scoreSaved && player.fullName.isNotEmpty()) {
+                val scoreRecord = ScoreRecord(
+                    playerName = player.fullName,
+                    score = score,
+                    difficultyLevel = player.difficultyLevel,
+                    course = player.course,
+                    zodiacSign = player.zodiacSign
+                )
+                coroutineScope.launch {
+                    try {
+                        database.scoreRecordDao().insert(scoreRecord)
+                        scoreSaved = true
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        }
+
         if (gameOver) {
             Column(
                 modifier = Modifier.align(Alignment.Center),
@@ -109,25 +136,42 @@ fun GameScreen(
             ) {
                 Text("Игра окончена!", fontSize = 30.sp, color = Color.Black)
                 Text("Ваш счёт: $score", fontSize = 24.sp, color = Color.DarkGray)
-                Spacer(Modifier.height(10.dp))
+
+                if (player.fullName.isNotEmpty() && scoreSaved) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Результат сохранен!",
+                        fontSize = 16.sp,
+                        color = Color.Green
+                    )
+                } else if (player.fullName.isEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Заполните анкету для сохранения рекорда",
+                        fontSize = 14.sp,
+                        color = Color.Red
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
                 Button(onClick = {
                     bugs = List(settings.maxCockroaches) { randomBug(areaWidthPx, areaHeightPx, settings.gameSpeed) }
                     score = 0
                     timeLeft = settings.roundDuration
                     gameOver = false
+                    scoreSaved = false
                 }) {
                     Text("Сыграть снова")
                 }
                 Spacer(Modifier.height(10.dp))
-//                Button(onClick = onExit) {
-//                    Text("Выход в меню")
-//                }
+                Button(onClick = onExit) {
+                    Text("Выход в меню")
+                }
             }
         } else {
             val painter = painterResource(id = R.drawable.bug)
             val densityLocal = LocalDensity.current
 
-            // Один pointerInput на весь экран
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -141,20 +185,17 @@ fun GameScreen(
                             }
 
                             if (clickedBugIndex != -1) {
-                                // Попал по жуку
                                 score++
                                 bugs = bugs.mapIndexed { i, b ->
                                     if (i == clickedBugIndex) randomBug(areaWidthPx, areaHeightPx, settings.gameSpeed)
                                     else b
                                 }
                             } else {
-                                // Промах по пустому месту
                                 score = maxOf(0, score - 1)
                             }
                         }
                     }
             ) {
-                // Отрисовка жуков поверх
                 bugs.forEach { bug ->
                     val sizeDp = with(densityLocal) { bug.sizePx.toDp() }
                     Image(
@@ -167,16 +208,34 @@ fun GameScreen(
                 }
             }
 
-            // UI сверху
-            Row(
+            Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("Очки: $score", fontSize = 20.sp, color = Color.Black)
-                Spacer(Modifier.width(40.dp))
-                Text("Время: $timeLeft", fontSize = 20.sp, color = Color.Black)
+                if (player.fullName.isNotEmpty()) {
+                    Text(
+                        "Игрок: ${player.fullName}",
+                        fontSize = 16.sp,
+                        color = Color.Black
+                    )
+                    Spacer(Modifier.height(4.dp))
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Очки: $score", fontSize = 20.sp, color = Color.Black)
+                    Text("Время: $timeLeft", fontSize = 20.sp, color = Color.Black)
+                }
+
+                Text(
+                    "Уровень: ${getDifficultyText(player.difficultyLevel)}",
+                    fontSize = 14.sp,
+                    color = Color.DarkGray
+                )
             }
         }
     }
@@ -193,4 +252,13 @@ private fun randomBug(areaWidthPx: Float, areaHeightPx: Float, speed: Float): Bu
 
 private fun randomVelocity(speed: Float): Float {
     return 5f * speed
+}
+
+private fun getDifficultyText(level: Int): String {
+    return when (level) {
+        1 -> "Легкий"
+        2 -> "Средний"
+        3 -> "Сложный"
+        else -> "Неизвестно"
+    }
 }

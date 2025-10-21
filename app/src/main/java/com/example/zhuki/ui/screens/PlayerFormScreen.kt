@@ -24,10 +24,9 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -79,7 +78,6 @@ fun PlayerFormScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // ФИО
             OutlinedTextField(
                 value = player.fullName,
                 onValueChange = { onPlayerUpdate(player.copy(fullName = it)) },
@@ -89,7 +87,6 @@ fun PlayerFormScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Пол
             Text("Пол:", modifier = Modifier.align(Alignment.Start))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -128,7 +125,6 @@ fun PlayerFormScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Курс (выпадающий список)
             ExposedDropdownMenuBox(
                 expanded = expanded,
                 onExpandedChange = { expanded = !expanded }
@@ -162,19 +158,15 @@ fun PlayerFormScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Уровень сложности
-            Text("Уровень сложности: ${player.difficultyLevel}", modifier = Modifier.align(Alignment.Start))
-            Slider(
-                value = player.difficultyLevel.toFloat(),
-                onValueChange = { onPlayerUpdate(player.copy(difficultyLevel = it.toInt())) },
-                valueRange = 1f..3f,
-                steps = 1,
-                modifier = Modifier.fillMaxWidth()
+            DifficultySection(
+                currentDifficulty = player.difficultyLevel,
+                onDifficultySelected = { difficulty ->
+                    onPlayerUpdate(player.copy(difficultyLevel = difficulty))
+                }
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Текущая выбранная дата
             if (player.zodiacSign.isNotEmpty()) {
                 Text(
                     text = "Выбранная дата: ${selectedDate.get(Calendar.DAY_OF_MONTH)}." +
@@ -184,7 +176,6 @@ fun PlayerFormScreen(
                 )
             }
 
-            // Кнопка выбора даты
             Button(
                 onClick = { showCalendarDialog = true },
                 modifier = Modifier.fillMaxWidth()
@@ -194,7 +185,6 @@ fun PlayerFormScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Знак зодиака
             if (player.zodiacSign.isNotEmpty()) {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
@@ -243,7 +233,6 @@ fun PlayerFormScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Кнопка отправки
             Button(
                 onClick = { showResults = true },
                 modifier = Modifier.fillMaxWidth(),
@@ -255,7 +244,6 @@ fun PlayerFormScreen(
                 Text("Сохранить данные")
             }
 
-            // Отображение результатов
             if (showResults) {
                 Spacer(modifier = Modifier.height(24.dp))
                 Card(
@@ -269,7 +257,7 @@ fun PlayerFormScreen(
                         Text("ФИО: ${player.fullName}")
                         Text("Пол: ${player.gender}")
                         Text("Курс: ${player.course}")
-                        Text("Уровень сложности: ${player.difficultyLevel}")
+                        Text("Уровень сложности: ${getDifficultyText(player.difficultyLevel)}")
                         Text("Дата рождения: ${player.birthDate.get(Calendar.DAY_OF_MONTH)}." +
                                 "${player.birthDate.get(Calendar.MONTH) + 1}." +
                                 "${player.birthDate.get(Calendar.YEAR)}")
@@ -278,7 +266,6 @@ fun PlayerFormScreen(
                 }
             }
 
-            // Диалог выбора даты
             if (showCalendarDialog) {
                 AlertDialog(
                     onDismissRequest = { showCalendarDialog = false },
@@ -333,5 +320,66 @@ fun PlayerFormScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+fun DifficultySection(
+    currentDifficulty: Int,
+    onDifficultySelected: (Int) -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "Уровень сложности: ${getDifficultyText(currentDifficulty)}",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = { onDifficultySelected(1) },
+                    modifier = Modifier.weight(1f),
+                    enabled = currentDifficulty != 1
+                ) {
+                    Text("Легко")
+                }
+                Button(
+                    onClick = { onDifficultySelected(2) },
+                    modifier = Modifier.weight(1f),
+                    enabled = currentDifficulty != 2
+                ) {
+                    Text("Средне")
+                }
+                Button(
+                    onClick = { onDifficultySelected(3) },
+                    modifier = Modifier.weight(1f),
+                    enabled = currentDifficulty != 3
+                ) {
+                    Text("Сложно")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "• Легко: 10 жуков, бонусы каждые 15 сек, 2 мин раунд\n" +
+                        "• Средне: 20 жуков, бонусы каждые 25 сек, 1.5 мин раунд\n" +
+                        "• Сложно: 35 жуков, бонусы каждые 35 сек, 1 мин раунд",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+private fun getDifficultyText(level: Int): String {
+    return when (level) {
+        1 -> "Легкий"
+        2 -> "Средний"
+        3 -> "Сложный"
+        else -> "Неизвестно"
     }
 }

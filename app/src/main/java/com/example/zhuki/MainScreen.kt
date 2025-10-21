@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -31,6 +32,7 @@ import com.example.zhuki.ui.screens.GameScreen
 import com.example.zhuki.ui.screens.PlayerFormScreen
 import com.example.zhuki.ui.screens.RulesScreen
 import com.example.zhuki.ui.screens.SettingsScreen
+import com.example.zhuki.ui.screens.RecordsScreen
 
 private data class BottomItem(
     val route: String,
@@ -45,8 +47,23 @@ fun MainScreen() {
     var gameSettings by remember { mutableStateOf(GameSettings()) }
     var player by remember { mutableStateOf(Player()) }
 
+    val updateDifficulty = { difficulty: Int ->
+        gameSettings = GameSettings.getByDifficulty(difficulty)
+        player = player.copy(difficultyLevel = difficulty)
+    }
+
+    fun detectDifficulty(settings: GameSettings): Int {
+        return when {
+            settings.maxCockroaches == 10 && settings.roundDuration == 120 -> 1
+            settings.maxCockroaches == 20 && settings.roundDuration == 90 -> 2
+            settings.maxCockroaches == 35 && settings.roundDuration == 60 -> 3
+            else -> player.difficultyLevel
+        }
+    }
+
     val items = listOf(
         BottomItem("game", "Игра", Icons.Filled.Home),
+        BottomItem("records", "Рекорды", Icons.Filled.Leaderboard),
         BottomItem("rules", "Правила", Icons.Filled.Info),
         BottomItem("authors", "Авторы", Icons.Filled.People),
         BottomItem("settings", "Настройки", Icons.Filled.Settings),
@@ -82,19 +99,39 @@ fun MainScreen() {
             startDestination = "profile",
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable("game") { GameScreen(settings = gameSettings) }
+            composable("game") {
+                GameScreen(
+                    settings = gameSettings,
+                    player = player,
+                    onExit = { navController.navigate("profile") }
+                )
+            }
+            composable("records") { RecordsScreen() }
             composable("rules") { RulesScreen() }
             composable("authors") { AuthorsScreen() }
             composable("settings") {
                 SettingsScreen(
                     gameSettings = gameSettings,
-                    onSettingsUpdate = { gameSettings = it }
+                    onSettingsUpdate = { newSettings ->
+                        gameSettings = newSettings
+                        val detectedDifficulty = detectDifficulty(newSettings)
+                        if (detectedDifficulty != player.difficultyLevel) {
+                            player = player.copy(difficultyLevel = detectedDifficulty)
+                        }
+                    }
                 )
             }
             composable("profile") {
                 PlayerFormScreen(
                     player = player,
-                    onPlayerUpdate = { player = it }
+                    onPlayerUpdate = { updatedPlayer ->
+                        val oldDifficulty = player.difficultyLevel
+                        player = updatedPlayer
+
+                        if (updatedPlayer.difficultyLevel != oldDifficulty) {
+                            gameSettings = GameSettings.getByDifficulty(updatedPlayer.difficultyLevel)
+                        }
+                    }
                 )
             }
         }
