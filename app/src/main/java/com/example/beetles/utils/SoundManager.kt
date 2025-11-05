@@ -2,6 +2,7 @@ package com.example.beetles.utils
 
 import android.content.Context
 import android.media.MediaPlayer
+import com.example.beetles.R
 import android.media.RingtoneManager
 import android.net.Uri
 
@@ -12,9 +13,7 @@ class SoundManager(private val context: Context) {
         try {
             beetleScreamPlayer?.release()
 
-            val notificationUri: Uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-
-            beetleScreamPlayer = MediaPlayer.create(context, notificationUri)
+            beetleScreamPlayer = MediaPlayer.create(context, R.raw.zvuk_litvina)
             beetleScreamPlayer?.isLooping = true
             beetleScreamPlayer?.start()
         } catch (e: Exception) {

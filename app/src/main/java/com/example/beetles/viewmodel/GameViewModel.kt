@@ -250,8 +250,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application), S
 
     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type == Sensor.TYPE_ACCELEROMETER && isBonusModeActive) {
-            gravityX = event.values[0] * gravityStrength
-            gravityY = event.values[1] * gravityStrength
+            gravityX = -event.values[0] * gravityStrength
+            gravityY = -event.values[1] * gravityStrength
         }
     }
 
