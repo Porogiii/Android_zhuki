@@ -11,5 +11,6 @@ data class Beetle(
     var lifeTime: Float = 5f,
     var isAlive: Boolean = true,
     var gravitySpeedX: Float = 0f,
-    var gravitySpeedY: Float = 0f
+    var gravitySpeedY: Float = 0f,
+    var isGolden: Boolean = false
 )

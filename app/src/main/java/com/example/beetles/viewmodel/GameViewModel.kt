@@ -25,6 +25,7 @@ import kotlin.random.Random
 import com.example.beetles.data.AppDatabase
 import com.example.beetles.data.GameRecord
 import com.example.beetles.repository.GameRecordRepository
+import com.example.beetles.repository.GoldRateRepository
 import com.example.beetles.repository.PlayerRepository
 import com.example.beetles.utils.SoundManager
 
@@ -33,6 +34,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application), S
     private val database = AppDatabase.getDatabase(application)
     private val gameRecordRepository = GameRecordRepository(database.gameRecordDao())
     private val playerRepository = PlayerRepository(database.playerDao())
+    private val goldRateRepository = GoldRateRepository()
     private val soundManager = SoundManager(application)
 
     private val sensorManager = application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
@@ -59,6 +61,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application), S
     private var countdownJob: Job? = null
     private var bonusJob: Job? = null
     private var bonusDurationJob: Job? = null
+    private var goldenBeetleJob: Job? = null
 
     private var nextBeetleId = 0
     private var screenWidth = 0f
@@ -76,27 +79,48 @@ class GameViewModel(application: Application) : AndroidViewModel(application), S
 
     fun initGame(width: Float, height: Float) {
         if (isInitialized) return
-
         isInitialized = true
         screenWidth = width
         screenHeight = height
 
         viewModelScope.launch {
+            loadGoldRate()
+
             val settings = settingsCache ?: repository.settingsFlow.first().also {
                 settingsCache = it
             }
 
             calculateDifficultyParameters(settings.gameSpeed)
 
+            val currentGoldRate = goldRateRepository.getCurrentGoldRate()
+
             _gameState.value = GameState(
                 maxBeetles = settings.maxBeetles,
                 gameSpeed = settings.gameSpeed,
                 timeLeft = settings.roundDuration,
                 isGameStarted = false,
-                countdown = 3
+                countdown = 3,
+                goldRate = currentGoldRate
             )
 
             startGame()
+        }
+    }
+
+    private suspend fun loadGoldRate() {
+        try {
+            val result = goldRateRepository.fetchGoldRate()
+            result.onSuccess { goldRate ->
+                android.util.Log.d("GameViewModel", "Курс золота загружен: ${goldRate.rate} руб/г")
+                _gameState.value = _gameState.value.copy(goldRate = goldRate.rate)
+            }.onFailure { exception ->
+                android.util.Log.e("GameViewModel", "Ошибка загрузки курса золота: ${exception.message}", exception)
+                _gameState.value = _gameState.value.copy(goldRate = 0.0)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("GameViewModel", "Исключение при загрузке курса золота", e)
+            e.printStackTrace()
+            _gameState.value = _gameState.value.copy(goldRate = 0.0)
         }
     }
 
@@ -131,6 +155,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application), S
             _gameState.value = _gameState.value.copy(isGameStarted = true, countdown = 0)
             startGameLoop()
             startBonusSpawner()
+            startGoldenBeetleSpawner()
         }
     }
 
@@ -195,6 +220,49 @@ class GameViewModel(application: Application) : AndroidViewModel(application), S
                         _gameState.value = _gameState.value.copy(showBonus = false)
                     }
                 }
+            }
+        }
+    }
+
+    private fun startGoldenBeetleSpawner() {
+        goldenBeetleJob = viewModelScope.launch {
+            while (!_gameState.value.isGameOver && _gameState.value.isGameStarted) {
+                delay(20000)
+
+                if (!beetles.any { it.isGolden && it.isAlive }) {
+                    spawnGoldenBeetle()
+                }
+            }
+        }
+    }
+
+    private fun spawnGoldenBeetle() {
+        val state = _gameState.value
+        val angle = Random.nextFloat() * 360f
+        val speed = state.gameSpeed * 2.5f
+        val speedX = kotlin.math.cos(Math.toRadians(angle.toDouble())).toFloat() * speed
+        val speedY = kotlin.math.sin(Math.toRadians(angle.toDouble())).toFloat() * speed
+
+        val goldenBeetle = Beetle(
+            id = nextBeetleId++,
+            x = Random.nextFloat() * (screenWidth - beetleSize),
+            y = Random.nextFloat() * (screenHeight - topBarHeight - bottomBarHeight - beetleSize) + topBarHeight,
+            speedX = speedX,
+            speedY = speedY,
+            rotation = angle + 90f,
+            directionChangeTimer = Random.nextFloat() * 2f + directionChangeInterval,
+            lifeTime = Float.MAX_VALUE,
+            isGolden = true
+        )
+
+        beetles.add(goldenBeetle)
+        _gameState.value = state.copy(hasGoldenBeetle = true)
+
+        viewModelScope.launch {
+            delay(10000)
+            if (goldenBeetle.isAlive) {
+                goldenBeetle.isAlive = false
+                _gameState.value = _gameState.value.copy(hasGoldenBeetle = false)
             }
         }
     }
@@ -348,7 +416,21 @@ class GameViewModel(application: Application) : AndroidViewModel(application), S
         if (beetle != null) {
             beetle.isAlive = false
             val state = _gameState.value
-            _gameState.value = state.copy(score = state.score + 10)
+
+            if (beetle.isGolden) {
+                val basePoints = if (state.goldRate > 0) {
+                    (state.goldRate * 0.12).toInt().coerceAtLeast(600)
+                } else {
+                    750
+                }
+
+                _gameState.value = state.copy(
+                    score = state.score + basePoints,
+                    hasGoldenBeetle = false
+                )
+            } else {
+                _gameState.value = state.copy(score = state.score + 10)
+            }
         }
     }
 
@@ -397,6 +479,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application), S
         countdownJob?.cancel()
         bonusJob?.cancel()
         bonusDurationJob?.cancel()
+        goldenBeetleJob?.cancel()
     }
 
     fun resetGame() {

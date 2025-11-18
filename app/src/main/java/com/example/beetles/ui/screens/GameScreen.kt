@@ -4,10 +4,12 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -24,6 +26,32 @@ import androidx.compose.ui.unit.sp
 import com.example.beetles.R
 import com.example.beetles.viewmodel.GameViewModel
 
+@Composable
+fun GoldRateBall(rate: Double, modifier: Modifier = Modifier) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(70.dp)
+            .background(Color(0xFFFFD700), shape = CircleShape)
+            .shadow(8.dp, shape = CircleShape)
+    ) {
+        if (rate > 0) {
+            Text(
+                text = "${rate.toInt()} ₽/г",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+        } else {
+            Text(
+                text = "Загрузка...",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp
+            )
+        }
+    }
+}
 @Composable
 fun GameScreen(
     viewModel: GameViewModel,
@@ -122,15 +150,30 @@ fun GameScreen(
                     val yPx = beetle.y.dp.toPx()
 
                     translate(left = xPx, top = yPx) {
+                        if (beetle.isGolden) {
+                            drawCircle(
+                                color = Color(0xFFFFD700).copy(alpha = 0.5f),
+                                radius = sizePx / 2 + 10.dp.toPx(),
+                                center = Offset(sizePx / 2, sizePx / 2)
+                            )
+                        }
+                        
                         rotate(
                             degrees = beetle.rotation,
                             pivot = Offset(sizePx / 2, sizePx / 2)
                         ) {
                             with(beetlePainter) {
-                                draw(
-                                    size = Size(sizePx, sizePx),
-                                    colorFilter = ColorFilter.tint(tintColor)
-                                )
+                                if (beetle.isGolden) {
+                                    draw(
+                                        size = Size(sizePx, sizePx),
+                                        colorFilter = ColorFilter.tint(Color(0xFFFFD700))
+                                    )
+                                } else {
+                                    draw(
+                                        size = Size(sizePx, sizePx),
+                                        colorFilter = ColorFilter.tint(tintColor)
+                                    )
+                                }
                             }
                         }
                     }
@@ -163,19 +206,27 @@ fun GameScreen(
                 .padding(16.dp)
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Очки: ${gameState.score}",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = if (gameState.score >= 0) Color.Green else Color.Red
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    GoldRateBall(rate = gameState.goldRate)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Очки: ${gameState.score}",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = if (gameState.score >= 0) Color.Green else Color.Red
+                    )
+                }
                 Text(
                     text = "Время: ${gameState.timeLeft}с",
                     style = MaterialTheme.typography.titleLarge
                 )
             }
+
 
             if (gameState.isBonusActive) {
                 Spacer(modifier = Modifier.height(8.dp))

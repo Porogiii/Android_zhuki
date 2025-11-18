@@ -13,5 +13,7 @@ data class GameState(
     val bonusX: Float = 0f,
     val bonusY: Float = 0f,
     val showBonus: Boolean = false,
-    val bonusTimeLeft: Int = 0
+    val bonusTimeLeft: Int = 0,
+    val goldRate: Double = 0.0,
+    val hasGoldenBeetle: Boolean = false
 )
